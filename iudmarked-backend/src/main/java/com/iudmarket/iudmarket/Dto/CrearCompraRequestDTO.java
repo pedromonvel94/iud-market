@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -12,5 +14,5 @@ import lombok.Setter;
 public class CrearCompraRequestDTO {
     private Long clienteId;
     private Long cajeraId;
-
+    private List<ItemCompraDTO> productos;
 }
