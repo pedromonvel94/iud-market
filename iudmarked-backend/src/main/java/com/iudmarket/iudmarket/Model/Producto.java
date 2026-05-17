@@ -17,7 +17,7 @@ public class Producto {
 
     private String nombre;
 
-    private Double precio;
+    private Integer precio;
 
     private Integer tiempoProcesamiento;
 }

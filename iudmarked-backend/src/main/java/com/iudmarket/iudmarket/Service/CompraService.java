@@ -4,6 +4,7 @@ import com.iudmarket.iudmarket.Dao.CajeraDao;
 import com.iudmarket.iudmarket.Dao.ClienteDao;
 import com.iudmarket.iudmarket.Dao.CompraDao;
 import com.iudmarket.iudmarket.Dao.DetalleCompraDao;
+import com.iudmarket.iudmarket.Dao.Productodao;
 import com.iudmarket.iudmarket.Dto.CrearCompraRequestDTO;
 import com.iudmarket.iudmarket.Dto.DetalleCompraResponseDTO;
 import com.iudmarket.iudmarket.Model.*;
@@ -40,6 +41,9 @@ public class CompraService {
 
     @Autowired
     private DetalleCompraDao detalleCompraDao;
+
+    @Autowired
+    private Productodao productoDao;
 
     // ─── Listamos todas las compras ──────────────────────────────────────
     public List<Compra> listarCompras() {
@@ -92,8 +96,8 @@ public class CompraService {
         if (cajera == null)
             throw new RuntimeException("Cajera no encontrada: " + dto.getCajeraId());
 
-        // 2. estado de cajera a OCUPADA (simula que la cajera está atendiendo al cliente)
-        cajera.setEstado("OCUPADA");
+        // 2. estado de cajera a inactiva (simula que la cajera está atendiendo al cliente)
+        cajera.setEstado("INACTIVA");
         cajeraDao.update(cajera);
         System.out.println(" [" + hilo + "] Cajera " + cajera.getNombre() + " ocupada");
 
@@ -131,7 +135,7 @@ public class CompraService {
             detalle.setCompra(compra);
             detalle.setProducto(producto);
             detalle.setCantidad(item.getCantidad());
-            detalle.setPrecioUnitario(producto.getPrecio());
+            detalle.setPrecioUnitario((double) producto.getPrecio());
             detalle.setSubtotal(subtotal);
             detalle.setTiempoProducto(tiempoProducto);
             detalleCompraDao.save(detalle);
@@ -148,11 +152,11 @@ public class CompraService {
         compra.setTiempoTotalProcesamiento(tiempoTotalSegundos);
         compraDao.save(compra);
 
-        // 6. Liberar cajera o cambia de estado a DISPONIBLE
-        cajera.setEstado("DISPONIBLE");
+        // 6. Liberar cajera o cambia de estado a activa
+        cajera.setEstado("ACTIVA");
         cajeraDao.update(cajera);
 
-        System.out.printf("🏁 [%s] Compra #%d finalizada | Total: $%.2f | Tiempo: %ds%n",
+        System.out.printf("[%s] Compra #%d finalizada | Total: $%.2f | Tiempo: %ds%n",
             hilo, compra.getId(), totalCompra, tiempoTotalSegundos);
 
         return CompletableFuture.completedFuture(compra);
@@ -174,18 +178,8 @@ public class CompraService {
         }
     }
 
-    /**
-     * Busca un producto por ID usando EntityManager vía JPA.
-     * Se puede reemplazar por un ProductoDao si lo agregamos.
-     */
+    /** Busca un producto por ID en catálogo. */
     private Producto buscarProducto(Long id) {
-        try {
-            // Usamos el contexto de JPA directamente ya que no hay ProductoDao en las interfaces actuales.(hay que revisar)
-           // esto es simulado, la verdad me lo sugiero la ia de github
-            return detalleCompraDao.findByCompraId(-1L)  // solo para obtener el em — ver nota abajo
-                   == null ? null : null;
-        } catch (Exception e) {
-            return null;
-        }
+        return productoDao.findById(id);
     }
 }

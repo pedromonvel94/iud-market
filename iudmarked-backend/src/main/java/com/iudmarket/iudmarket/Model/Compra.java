@@ -23,9 +23,11 @@ public class Compra {
 
     private Integer tiempoTotalProcesamiento;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_cliente", nullable = false)
     private Cliente cliente;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_cajera", nullable = false)
     private Cajera cajera;
 }

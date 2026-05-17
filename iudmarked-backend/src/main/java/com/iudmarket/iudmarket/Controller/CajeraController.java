@@ -1,7 +1,7 @@
 package com.iudmarket.iudmarket.Controller;
 
 import com.iudmarket.iudmarket.Model.Cajera;
-import com.iudmarket.iudmarket.Service.Cajeraservice;
+import com.iudmarket.iudmarket.Service.CajeraService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,10 +10,10 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/cajeras")
-public class Cajeracontroller {
+public class CajeraController {
 
     @Autowired
-    private Cajeraservice cajeraService;
+    private CajeraService cajeraService;
 
     // POST 
     @PostMapping
@@ -43,9 +43,7 @@ public class Cajeracontroller {
 
     // PUT 
     @PutMapping("/{id}/estado")
-    public ResponseEntity<Cajera> cambiarEstado(
-            @PathVariable Long id,
-            @RequestParam String nuevoEstado) {
+    public ResponseEntity<Cajera> cambiarEstado(@PathVariable Long id, @RequestParam String nuevoEstado) {
         return ResponseEntity.ok(cajeraService.actualizarEstado(id, nuevoEstado));
     }
 

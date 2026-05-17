@@ -22,17 +22,17 @@ public class Productoservice {
     }
 
     public Producto buscarPorId(Long id) {
-        Producto p = productoDao.findById(id);
-        if (p == null) throw new RuntimeException("Producto no encontrado: " + id);
-        return p;
+        Producto producto = productoDao.findById(id);
+        if (producto == null) throw new RuntimeException("Producto no encontrado: " + id);
+        return producto;
     }
 
     public Producto actualizar(Long id, Producto datos) {
-        Producto p = buscarPorId(id);
-        p.setNombre(datos.getNombre());
-        p.setPrecio(datos.getPrecio());
-        p.setTiempoProcesamiento(datos.getTiempoProcesamiento());
-        return productoDao.update(p);
+        Producto producto = buscarPorId(id);
+        producto.setNombre(datos.getNombre());
+        producto.setPrecio(datos.getPrecio());
+        producto.setTiempoProcesamiento(datos.getTiempoProcesamiento());
+        return productoDao.update(producto);
     }
 
     public boolean eliminar(Long id) {

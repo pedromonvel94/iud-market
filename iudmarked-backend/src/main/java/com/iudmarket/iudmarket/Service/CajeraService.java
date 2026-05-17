@@ -7,13 +7,13 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
-public class Cajeraservice {
+public class CajeraService {
 
     @Autowired
     private CajeraDao cajeraDao;
 
     public Cajera crearCajera(Cajera cajera) {
-        cajera.setEstado("DISPONIBLE");
+        cajera.setEstado("ACTIVA");
         return cajeraDao.save(cajera);
     }
 
@@ -26,7 +26,7 @@ public class Cajeraservice {
     }
 
     public List<Cajera> cajerasDisponibles() {
-        return cajeraDao.findAvailableCashiers("DISPONIBLE");
+        return cajeraDao.findAvailableCashiers("ACTIVA");
     }
 
     public Cajera actualizarEstado(Long id, String nuevoEstado) {
