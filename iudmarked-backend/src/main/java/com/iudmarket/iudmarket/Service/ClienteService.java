@@ -3,6 +3,7 @@ package com.iudmarket.iudmarket.Service;
 import com.iudmarket.iudmarket.Dao.ClienteDao;
 import com.iudmarket.iudmarket.Dto.CrearClienteRequestDTO;
 import com.iudmarket.iudmarket.Model.Cliente;
+import com.iudmarket.iudmarket.exception.RecursoNoEncontradoException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +28,9 @@ public class ClienteService {
 
     public Cliente buscarPorId(Long id) {
         Cliente cliente = clienteDao.findById(id);
-        if (cliente == null) throw new RuntimeException("no se ha podido encontrar el cliente con el id: " + id);
+        if (cliente == null) {
+            throw new RecursoNoEncontradoException("Cliente no encontrado con id: " + id);
+        }
         return cliente;
     }
 
@@ -39,6 +42,7 @@ public class ClienteService {
     }
 
     public boolean eliminar(Long id) {
+        buscarPorId(id);
         return clienteDao.deleteById(id);
     }
 }

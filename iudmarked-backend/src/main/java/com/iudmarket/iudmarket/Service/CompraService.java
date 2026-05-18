@@ -1,34 +1,52 @@
 package com.iudmarket.iudmarket.Service;
 
+
+
 import com.iudmarket.iudmarket.Dao.CajeraDao;
+
 import com.iudmarket.iudmarket.Dao.ClienteDao;
+
 import com.iudmarket.iudmarket.Dao.CompraDao;
+
 import com.iudmarket.iudmarket.Dao.DetalleCompraDao;
+
 import com.iudmarket.iudmarket.Dao.Productodao;
+
 import com.iudmarket.iudmarket.Dto.CrearCompraRequestDTO;
+
 import com.iudmarket.iudmarket.Dto.DetalleCompraResponseDTO;
+
 import com.iudmarket.iudmarket.Model.*;
+
+import com.iudmarket.iudmarket.exception.CajeraNoDisponibleException;
+
+import com.iudmarket.iudmarket.exception.RecursoNoEncontradoException;
+
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.scheduling.annotation.Async;
+
 import org.springframework.stereotype.Service;
+
 import org.springframework.transaction.annotation.Transactional;
 
+
+
 import java.time.LocalDateTime;
+
 import java.util.ArrayList;
+
 import java.util.List;
+
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Servicio principal de compras.
- *
- * en teoria deberia funcionar asi:
- *  - Cada producto tiene un tiempoProcesamiento (supongamos en segundos)
- *  - Al procesar la compra, se suma el tiempo de todos los productos
- *  - Con @Async  segun lo que vi el cobro de cada compra corre en un hilo separado del pool "cajeraExecutor"
- *  - Esto simula que varias cajeras atienden clientes al mismo tiempo
- */
+
 @Service
+
 public class CompraService {
+
+    private static final String ESTADO_ACTIVA = "ACTIVA";
+    private static final String ESTADO_INACTIVA = "INACTIVA";
 
     @Autowired
     private CompraDao compraDao;
@@ -45,19 +63,26 @@ public class CompraService {
     @Autowired
     private Productodao productoDao;
 
-    // ─── Listamos todas las compras ──────────────────────────────────────
     public List<Compra> listarCompras() {
         return compraDao.findAll();
     }
 
-    // ─── Compras de un cliente específico ─────────────────────────────
     public List<Compra> comprasPorCliente(Long clienteId) {
         return compraDao.findComprasByCliente(clienteId);
     }
 
-    // ─── Detalle de una compra ────────────────────────────────────────
     public List<DetalleCompraResponseDTO> detalleCompra(Long compraId) {
+        Compra compra = compraDao.findById(compraId);
+        if (compra == null) {
+            throw new RecursoNoEncontradoException("Compra no encontrada con id: " + compraId);
+        }
+
         List<DetalleCompra> detalles = detalleCompraDao.findByCompraId(compraId);
+
+        if (detalles.isEmpty()) {
+            throw new RecursoNoEncontradoException("No hay detalle para la compra id: " + compraId);
+        }
+
         List<DetalleCompraResponseDTO> respuesta = new ArrayList<>();
 
         for (DetalleCompra d : detalles) {
@@ -72,14 +97,6 @@ public class CompraService {
         return respuesta;
     }
 
-    // ─── asi se procesan las compras de forma ASÍNCRONA ───────────────────────────
-    /**
-     * @Async en nuesto caso iudmarketapp.... hace que este método corra en un hilo separado del pool "cajeraExecutor".
-     * Esto simula que la cajera está procesando al cliente mientras otras cajeras
-     * atienden a otros clientes al mismo tiempo (concurrencia real).
-     *
-     * CompletableFuture permite esperar el resultado cuando sea necesario.
-     */
     @Async("cajeraExecutor")
     @Transactional
     public CompletableFuture<Compra> procesarCompraAsync(CrearCompraRequestDTO dto) {
@@ -87,21 +104,27 @@ public class CompraService {
         String hilo = Thread.currentThread().getName();
         System.out.println("🧵 [" + hilo + "] Iniciando cobro para cliente ID: " + dto.getClienteId());
 
-        // 1. Validacion de cliente y cajera
         Cliente cliente = clienteDao.findById(dto.getClienteId());
-        if (cliente == null)
-            throw new RuntimeException("Cliente no encontrado: " + dto.getClienteId());
+
+        if (cliente == null) {
+            throw new RecursoNoEncontradoException("Cliente no encontrado con id: " + dto.getClienteId());
+        }
 
         Cajera cajera = cajeraDao.findById(dto.getCajeraId());
-        if (cajera == null)
-            throw new RuntimeException("Cajera no encontrada: " + dto.getCajeraId());
 
-        // 2. estado de cajera a inactiva (simula que la cajera está atendiendo al cliente)
-        cajera.setEstado("INACTIVA");
+        if (cajera == null) {
+            throw new RecursoNoEncontradoException("Cajera no encontrada con id: " + dto.getCajeraId());
+        }
+
+        if (!ESTADO_ACTIVA.equals(cajera.getEstado())) {
+            throw new CajeraNoDisponibleException(cajera.getNombre(), cajera.getId());
+        }
+
+        // Cajera pasa a INACTIVA mientras atiende (cobrando)
+        cajera.setEstado(ESTADO_INACTIVA);
         cajeraDao.update(cajera);
         System.out.println(" [" + hilo + "] Cajera " + cajera.getNombre() + " ocupada");
 
-        // 3. Crear cabecera de la compra
         Compra compra = new Compra();
         compra.setCliente(cliente);
         compra.setCajera(cajera);
@@ -110,28 +133,24 @@ public class CompraService {
         compra.setTiempoTotalProcesamiento(0);
         compraDao.save(compra);
 
-        // 4. Procesar cada producto y simula el cobro uno a uno
-        double totalCompra         = 0.0;
-        int    tiempoTotalSegundos = 0;
+        double totalCompra = 0.0;
+        int tiempoTotalSegundos = 0;
 
         for (var item : dto.getProductos()) {
 
-            // Buscar producto
             Producto producto = buscarProducto(item.getIdProducto());
+
             if (producto == null) {
                 System.out.println("  Producto no encontrado: " + item.getIdProducto() + " — omitido");
                 continue;
             }
 
-            // Calcular valores
-            double subtotal       = producto.getPrecio() * item.getCantidad();
-            int    tiempoProducto = producto.getTiempoProcesamiento() * item.getCantidad();
-
-            // Simular tiempo real de escaneo (1 segundo por cada unidad de tiempo)
+            double subtotal = producto.getPrecio() * item.getCantidad();
+            int tiempoProducto = producto.getTiempoProcesamiento() * item.getCantidad();
             simularTiempo(tiempoProducto);
 
-            // Guardar detalle
             DetalleCompra detalle = new DetalleCompra();
+
             detalle.setCompra(compra);
             detalle.setProducto(producto);
             detalle.setCantidad(item.getCantidad());
@@ -140,46 +159,41 @@ public class CompraService {
             detalle.setTiempoProducto(tiempoProducto);
             detalleCompraDao.save(detalle);
 
-            totalCompra         += subtotal;
+            totalCompra += subtotal;
             tiempoTotalSegundos += tiempoProducto;
 
             System.out.printf("    [%s] Producto: %-25s | Cant: %d | Subtotal: $%.2f | Tiempo: %ds%n",
-                hilo, producto.getNombre(), item.getCantidad(), subtotal, tiempoProducto);
+                    hilo, producto.getNombre(), item.getCantidad(), subtotal, tiempoProducto);
+
         }
 
-        // 5. Actualiza el total de la compra
         compra.setTotalCompra(totalCompra);
         compra.setTiempoTotalProcesamiento(tiempoTotalSegundos);
         compraDao.save(compra);
 
-        // 6. Liberar cajera o cambia de estado a activa
-        cajera.setEstado("ACTIVA");
+        // Cajera vuelve a ACTIVA (libre)
+        cajera.setEstado(ESTADO_ACTIVA);
         cajeraDao.update(cajera);
 
         System.out.printf("[%s] Compra #%d finalizada | Total: $%.2f | Tiempo: %ds%n",
-            hilo, compra.getId(), totalCompra, tiempoTotalSegundos);
+                hilo, compra.getId(), totalCompra, tiempoTotalSegundos);
 
         return CompletableFuture.completedFuture(compra);
+
     }
 
-    // ─── Utilidades privadas ──────────────────────────────────────────
-
-    /**
-     * Simula el tiempo de procesamiento de un producto.
-     * En un sistema real esto sería el tiempo real de escaneo.
-     * Aquí dormimos el hilo para hacer la simulación visible.
-     */
     private void simularTiempo(int segundos) {
         try {
-            // Cada unidad = 500ms para que la demo no tarde demasiado, podemos ajustar esto según lo que queramos mostrar
             Thread.sleep(segundos * 500L);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
     }
 
-    /** Busca un producto por ID en catálogo. */
     private Producto buscarProducto(Long id) {
         return productoDao.findById(id);
     }
+
 }
+
+

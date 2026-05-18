@@ -2,6 +2,7 @@ package com.iudmarket.iudmarket.Service;
 
 import com.iudmarket.iudmarket.Dao.Productodao;
 import com.iudmarket.iudmarket.Model.Producto;
+import com.iudmarket.iudmarket.exception.RecursoNoEncontradoException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,9 @@ public class Productoservice {
 
     public Producto buscarPorId(Long id) {
         Producto producto = productoDao.findById(id);
-        if (producto == null) throw new RuntimeException("Producto no encontrado: " + id);
+        if (producto == null) {
+            throw new RecursoNoEncontradoException("Producto no encontrado con id: " + id);
+        }
         return producto;
     }
 
@@ -36,6 +39,7 @@ public class Productoservice {
     }
 
     public boolean eliminar(Long id) {
+        buscarPorId(id);
         return productoDao.deleteById(id);
     }
 }
